@@ -1687,6 +1687,25 @@ def normalize_origin_value(value: str | None) -> str:
     return f"{scheme}://{netloc}"
 
 
+def origins_share_same_host(value_a: str, value_b: str) -> bool:
+    if not value_a or not value_b:
+        return False
+    try:
+        parsed_a = urlparse(value_a)
+        parsed_b = urlparse(value_b)
+    except ValueError:
+        return False
+    if not parsed_a.hostname or not parsed_b.hostname:
+        return False
+    if parsed_a.hostname.lower() != parsed_b.hostname.lower():
+        return False
+    default_port_a = 443 if (parsed_a.scheme or "").lower() == "https" else 80
+    default_port_b = 443 if (parsed_b.scheme or "").lower() == "https" else 80
+    port_a = parsed_a.port or default_port_a
+    port_b = parsed_b.port or default_port_b
+    return port_a == port_b
+
+
 def get_browser_supplied_origin(request: Request) -> tuple[bool, str]:
     raw_origin = (request.headers.get("Origin") or "").strip()
     if raw_origin:
@@ -1707,7 +1726,10 @@ def validate_browser_origin(request: Request) -> JSONResponse | None:
     has_browser_origin, supplied_origin = get_browser_supplied_origin(request)
     if not has_browser_origin:
         return None
-    if supplied_origin == get_request_origin(request).lower():
+    request_origin = get_request_origin(request).lower()
+    if supplied_origin == request_origin:
+        return None
+    if supplied_origin != "null" and origins_share_same_host(supplied_origin, request_origin):
         return None
     return JSONResponse({"detail": "Cross-site browser requests are not allowed."}, status_code=403)
 
