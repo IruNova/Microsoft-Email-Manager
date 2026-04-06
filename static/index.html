@@ -8797,10 +8797,9 @@ example3@live.com----refresh_token3----client_id3`;
                     console.error('Clipboard copy failed:', error);
                     fallbackCopy();
                 });
-                return;
+            } else {
+                fallbackCopy();
             }
-
-            fallbackCopy();
         }
 
         function downloadApiDocs() {
@@ -10447,7 +10446,6 @@ Authorization: Bearer om_your_api_key
     </script>
 </body>
 </html>
-
 
 
 
