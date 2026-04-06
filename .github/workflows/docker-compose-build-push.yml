@@ -4,18 +4,22 @@ on:
   push:
     branches: [ "main" ]
     tags: [ "v*" ]
-  workflow_dispatch:  # 手动触发
+  workflow_dispatch:
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write   # 必须要有这个权限才能推 ghcr.io
+      packages: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      # ←←← 新增这一步（关键修复！）
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -24,7 +28,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata (自动生成 tags)
+      - name: Extract Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
