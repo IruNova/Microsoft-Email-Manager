@@ -121,6 +121,8 @@ BUILTIN_ACCOUNT_CLASSIFICATIONS: dict[str, dict[str, dict[str, Any]]] = {
 ADMIN_LOGIN_PATH_PATTERN = re.compile(r"^/[a-zA-Z0-9/_-]{2,120}$")
 HOSTNAME_PATTERN = re.compile(r"^[a-z0-9.-]+(?::\d{1,5})?$")
 SAFE_BROWSER_METHODS = {"GET", "HEAD", "OPTIONS"}
+DEFAULT_HTTP_PORT = 80
+DEFAULT_HTTPS_PORT = 443
 LOCAL_DOMAIN_ICON_RULES: list[tuple[str, tuple[str, ...]]] = [
     (
         "microsoft.svg",
@@ -1699,8 +1701,8 @@ def origins_share_same_host(value_a: str, value_b: str) -> bool:
         return False
     if parsed_a.hostname.lower() != parsed_b.hostname.lower():
         return False
-    default_port_a = 443 if (parsed_a.scheme or "").lower() == "https" else 80
-    default_port_b = 443 if (parsed_b.scheme or "").lower() == "https" else 80
+    default_port_a = DEFAULT_HTTPS_PORT if (parsed_a.scheme or "").lower() == "https" else DEFAULT_HTTP_PORT
+    default_port_b = DEFAULT_HTTPS_PORT if (parsed_b.scheme or "").lower() == "https" else DEFAULT_HTTP_PORT
     port_a = parsed_a.port or default_port_a
     port_b = parsed_b.port or default_port_b
     return port_a == port_b
@@ -1729,7 +1731,9 @@ def validate_browser_origin(request: Request) -> JSONResponse | None:
     request_origin = get_request_origin(request).lower()
     if supplied_origin == request_origin:
         return None
-    if supplied_origin != "null" and origins_share_same_host(supplied_origin, request_origin):
+    if supplied_origin == "null":
+        return JSONResponse({"detail": "Cross-site browser requests are not allowed."}, status_code=403)
+    if origins_share_same_host(supplied_origin, request_origin):
         return None
     return JSONResponse({"detail": "Cross-site browser requests are not allowed."}, status_code=403)
 
