@@ -8747,19 +8747,15 @@ example3@live.com----refresh_token3----client_id3`;
 
         function copyEmailAddress(emailAddress) {
             // 清理邮箱地址（去除可能的空格和特殊字符）
-            const cleanEmail = emailAddress.trim();
+            const cleanEmail = String(emailAddress || '').trim();
 
             if (!cleanEmail) {
                 showNotification('邮箱地址为空', 'error');
                 return;
             }
 
-            // 复制到剪贴板
-            navigator.clipboard.writeText(cleanEmail).then(() => {
-                // 显示成功通知
+            const onCopySuccess = () => {
                 showNotification('邮箱地址已复制到剪贴板', 'success');
-
-                // 添加视觉反馈
                 const emailElement = document.getElementById('currentAccountEmail');
                 if (emailElement) {
                     emailElement.classList.add('copy-success');
@@ -8767,10 +8763,10 @@ example3@live.com----refresh_token3----client_id3`;
                         emailElement.classList.remove('copy-success');
                     }, 300);
                 }
-            }).catch((error) => {
-                console.error('复制失败:', error);
+            };
 
-            try {
+            const fallbackCopy = () => {
+                try {
                     const textArea = document.createElement('textarea');
                     textArea.value = cleanEmail;
                     textArea.style.position = 'fixed';
@@ -8779,8 +8775,7 @@ example3@live.com----refresh_token3----client_id3`;
                     textArea.select();
                     document.execCommand('copy');
                     document.body.removeChild(textArea);
-
-                    showNotification('邮箱地址已复制到剪贴板', 'success');
+                    onCopySuccess();
                 } catch (fallbackError) {
                     console.error('Fallback copy failed:', fallbackError);
                     showNotification('复制失败，请手动复制邮箱地址', 'error');
@@ -8795,7 +8790,17 @@ example3@live.com----refresh_token3----client_id3`;
                         selection.addRange(range);
                     }
                 }
-            });
+            };
+
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                navigator.clipboard.writeText(cleanEmail).then(onCopySuccess).catch((error) => {
+                    console.error('Clipboard copy failed:', error);
+                    fallbackCopy();
+                });
+                return;
+            }
+
+            fallbackCopy();
         }
 
         function downloadApiDocs() {
@@ -10442,7 +10447,6 @@ Authorization: Bearer om_your_api_key
     </script>
 </body>
 </html>
-
 
 
 
