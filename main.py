@@ -121,6 +121,9 @@ BUILTIN_ACCOUNT_CLASSIFICATIONS: dict[str, dict[str, dict[str, Any]]] = {
 ADMIN_LOGIN_PATH_PATTERN = re.compile(r"^/[a-zA-Z0-9/_-]{2,120}$")
 HOSTNAME_PATTERN = re.compile(r"^[a-z0-9.-]+(?::\d{1,5})?$")
 SAFE_BROWSER_METHODS = {"GET", "HEAD", "OPTIONS"}
+DEFAULT_HTTP_PORT = 80
+DEFAULT_HTTPS_PORT = 443
+NULL_ORIGIN = "null"
 LOCAL_DOMAIN_ICON_RULES: list[tuple[str, tuple[str, ...]]] = [
     (
         "microsoft.svg",
@@ -1687,11 +1690,34 @@ def normalize_origin_value(value: str | None) -> str:
     return f"{scheme}://{netloc}"
 
 
+def origins_share_same_host(value_a: str, value_b: str) -> bool:
+    if not value_a or not value_b:
+        return False
+    try:
+        parsed_a = urlparse(value_a)
+        parsed_b = urlparse(value_b)
+    except ValueError:
+        return False
+    if not parsed_a.hostname or not parsed_b.hostname:
+        return False
+    scheme_a = (parsed_a.scheme or "").lower()
+    scheme_b = (parsed_b.scheme or "").lower()
+    if scheme_a not in {"http", "https"} or scheme_b not in {"http", "https"}:
+        return False
+    if parsed_a.hostname.lower() != parsed_b.hostname.lower():
+        return False
+    default_port_a = DEFAULT_HTTPS_PORT if scheme_a == "https" else DEFAULT_HTTP_PORT
+    default_port_b = DEFAULT_HTTPS_PORT if scheme_b == "https" else DEFAULT_HTTP_PORT
+    port_a = parsed_a.port or default_port_a
+    port_b = parsed_b.port or default_port_b
+    return port_a == port_b
+
+
 def get_browser_supplied_origin(request: Request) -> tuple[bool, str]:
     raw_origin = (request.headers.get("Origin") or "").strip()
     if raw_origin:
-        if raw_origin.lower() == "null":
-            return True, "null"
+        if raw_origin.lower() == NULL_ORIGIN:
+            return True, NULL_ORIGIN
         return True, normalize_origin_value(raw_origin)
 
     raw_referer = (request.headers.get("Referer") or "").strip()
@@ -1707,7 +1733,12 @@ def validate_browser_origin(request: Request) -> JSONResponse | None:
     has_browser_origin, supplied_origin = get_browser_supplied_origin(request)
     if not has_browser_origin:
         return None
-    if supplied_origin == get_request_origin(request).lower():
+    request_origin = get_request_origin(request).lower()
+    if supplied_origin == request_origin:
+        return None
+    if supplied_origin == NULL_ORIGIN:
+        return JSONResponse({"detail": "Cross-site browser requests are not allowed."}, status_code=403)
+    if origins_share_same_host(supplied_origin, request_origin):
         return None
     return JSONResponse({"detail": "Cross-site browser requests are not allowed."}, status_code=403)
 
